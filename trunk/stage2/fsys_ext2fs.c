@@ -543,7 +543,7 @@ int ext2_is_fast_symlink (void)
  * side effects: messes up GROUP_DESC buffer area
  */
 int
-ext2fs_dir (char *dirname, void (*handle)(char *))
+ext2fs_dir (char *dirname)
 {
   int current_ino = EXT2_ROOT_INO;	/* start at the root */
   int updir_ino = current_ino;	/* the parent of the current directory */
@@ -569,6 +569,7 @@ ext2fs_dir (char *dirname, void (*handle)(char *))
 #ifdef E2DEBUG
   unsigned char *i;
 #endif	/* E2DEBUG */
+
   /* loop invariants:
      current_ino = inode to lookup
      dirname = pointer to filename component we are cur looking up within
@@ -760,9 +761,18 @@ ext2fs_dir (char *dirname, void (*handle)(char *))
 	     give up */
 	  if (loc >= INODE->i_size)
 	    {
-	      errnum = ERR_FILE_NOT_FOUND;
-	      *rest = ch;
-	      return 0;
+	      if (print_possibilities < 0)
+		{
+# if 0
+		  putchar ('\n');
+# endif
+		}
+	      else
+		{
+		  errnum = ERR_FILE_NOT_FOUND;
+		  *rest = ch;
+		}
+	      return (print_possibilities < 0);
 	    }
 
 	  /* else, find the (logical) block component of our location */
@@ -803,15 +813,20 @@ ext2fs_dir (char *dirname, void (*handle)(char *))
 	      str_chk = substring (dirname, dp->name);
 
 # ifndef STAGE1_5
-	      if (handle && ch != '/' && (!*dirname || str_chk <= 0))
-		handle (dp->name);
+	      if (print_possibilities && ch != '/'
+		  && (!*dirname || str_chk <= 0))
+		{
+		  if (print_possibilities > 0)
+		    print_possibilities = -print_possibilities;
+		  print_a_completion (dp->name);
+		}
 # endif
 
 	      dp->name[dp->name_len] = saved_c;
 	    }
 
 	}
-      while (!dp->inode || (str_chk || (handle && ch != '/')));
+      while (!dp->inode || (str_chk || (print_possibilities && ch != '/')));
 
       current_ino = dp->inode;
       *(dirname = rest) = ch;

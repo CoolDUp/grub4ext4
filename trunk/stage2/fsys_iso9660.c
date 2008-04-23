@@ -133,7 +133,7 @@ iso9660_mount (void)
 }
 
 int
-iso9660_dir (char *dirname, void (*handle)(char *))
+iso9660_dir (char *dirname)
 {
   struct iso_directory_record *idr;
   RR_ptr_t rr_ptr;
@@ -346,7 +346,7 @@ iso9660_dir (char *dirname, void (*handle)(char *))
 	      if (name_len >= pathlen
 		  && !memcmp(name, dirname, pathlen))
 		{
-		  if (dirname[pathlen] == '/' || !handle)
+		  if (dirname[pathlen] == '/' || !print_possibilities)
 		    {
 		      /*
 		       *  DIRNAME is directory component of pathname,
@@ -377,9 +377,11 @@ iso9660_dir (char *dirname, void (*handle)(char *))
 		  else	/* Completion */
 		    {
 #ifndef STAGE1_5
+		      if (print_possibilities > 0)
+			print_possibilities = -print_possibilities;
 		      memcpy(NAME_BUF, name, name_len);
 		      NAME_BUF[name_len] = '\0';
-		      handle (NAME_BUF);
+		      print_a_completion (NAME_BUF);
 #endif
 		    }
 		}
@@ -388,7 +390,7 @@ iso9660_dir (char *dirname, void (*handle)(char *))
 	  size -= ISO_SECTOR_SIZE;
 	} /* size>0 */
 
-      if (dirname[pathlen] == '/' || handle)
+      if (dirname[pathlen] == '/' || print_possibilities >= 0)
 	{
 	  errnum = ERR_FILE_NOT_FOUND;
 	  return 0;

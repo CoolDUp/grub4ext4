@@ -534,7 +534,7 @@ xfs_read (char *buf, int len)
 }
 
 int
-xfs_dir (char *dirname, void (*handle)(char *))
+xfs_dir (char *dirname)
 {
 	xfs_ino_t ino, parent_ino, new_ino;
 	xfs_fsize_t di_size;
@@ -595,9 +595,11 @@ xfs_dir (char *dirname, void (*handle)(char *))
 		for (;;) {
 			cmp = (!*dirname) ? -1 : substring (dirname, name);
 #ifndef STAGE1_5
-			if (handle && ch != '/' && cmp <= 0)
-				handle (name);
-			else
+			if (print_possibilities && ch != '/' && cmp <= 0) {
+				if (print_possibilities > 0)
+					print_possibilities = -print_possibilities;
+				print_a_completion (name);
+			} else
 #endif
 			if (cmp == 0) {
 				parent_ino = ino;
@@ -608,6 +610,9 @@ xfs_dir (char *dirname, void (*handle)(char *))
 			}
 			name = next_dentry (&new_ino);
 			if (name == NULL) {
+				if (print_possibilities < 0)
+					return 1;
+
 				errnum = ERR_FILE_NOT_FOUND;
 				*rest = ch;
 				return 0;

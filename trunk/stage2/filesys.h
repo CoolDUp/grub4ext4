@@ -24,7 +24,7 @@
 #define FSYS_FFS_NUM 1
 int ffs_mount (void);
 int ffs_read (char *buf, int len);
-int ffs_dir (char *dirname, void (*handle)(char *));
+int ffs_dir (char *dirname);
 int ffs_embed (int *start_sector, int needed_sectors);
 #else
 #define FSYS_FFS_NUM 0
@@ -34,7 +34,7 @@ int ffs_embed (int *start_sector, int needed_sectors);
 #define FSYS_UFS2_NUM 1
 int ufs2_mount (void);
 int ufs2_read (char *buf, int len);
-int ufs2_dir (char *dirname, void (*handle)(char *));
+int ufs2_dir (char *dirname);
 int ufs2_embed (int *start_sector, int needed_sectors);
 #else
 #define FSYS_UFS2_NUM 0
@@ -44,7 +44,7 @@ int ufs2_embed (int *start_sector, int needed_sectors);
 #define FSYS_FAT_NUM 1
 int fat_mount (void);
 int fat_read (char *buf, int len);
-int fat_dir (char *dirname, void (*handle)(char *));
+int fat_dir (char *dirname);
 #else
 #define FSYS_FAT_NUM 0
 #endif
@@ -53,7 +53,7 @@ int fat_dir (char *dirname, void (*handle)(char *));
 #define FSYS_EXT2FS_NUM 1
 int ext2fs_mount (void);
 int ext2fs_read (char *buf, int len);
-int ext2fs_dir (char *dirname, void (*handle)(char *));
+int ext2fs_dir (char *dirname);
 #else
 #define FSYS_EXT2FS_NUM 0
 #endif
@@ -62,7 +62,7 @@ int ext2fs_dir (char *dirname, void (*handle)(char *));
 #define FSYS_MINIX_NUM 1
 int minix_mount (void);
 int minix_read (char *buf, int len);
-int minix_dir (char *dirname, void (*handle)(char *));
+int minix_dir (char *dirname);
 #else
 #define FSYS_MINIX_NUM 0
 #endif
@@ -71,7 +71,7 @@ int minix_dir (char *dirname, void (*handle)(char *));
 #define FSYS_REISERFS_NUM 1
 int reiserfs_mount (void);
 int reiserfs_read (char *buf, int len);
-int reiserfs_dir (char *dirname, void (*handle)(char *));
+int reiserfs_dir (char *dirname);
 int reiserfs_embed (int *start_sector, int needed_sectors);
 #if defined(__linux__) && defined (GRUB_UTIL)
 #include <sys/types.h>
@@ -91,7 +91,7 @@ int reiserfs_embed (int *start_sector, int needed_sectors);
 #define FSYS_VSTAFS_NUM 1
 int vstafs_mount (void);
 int vstafs_read (char *buf, int len);
-int vstafs_dir (char *dirname, void (*handle)(char *));
+int vstafs_dir (char *dirname);
 #else
 #define FSYS_VSTAFS_NUM 0
 #endif
@@ -100,7 +100,7 @@ int vstafs_dir (char *dirname, void (*handle)(char *));
 #define FSYS_JFS_NUM 1
 int jfs_mount (void);
 int jfs_read (char *buf, int len);
-int jfs_dir (char *dirname, void (*handle)(char *));
+int jfs_dir (char *dirname);
 int jfs_embed (int *start_sector, int needed_sectors);
 #else
 #define FSYS_JFS_NUM 0
@@ -110,7 +110,7 @@ int jfs_embed (int *start_sector, int needed_sectors);
 #define FSYS_XFS_NUM 1
 int xfs_mount (void);
 int xfs_read (char *buf, int len);
-int xfs_dir (char *dirname, void (*handle)(char *));
+int xfs_dir (char *dirname);
 #else
 #define FSYS_XFS_NUM 0
 #endif
@@ -119,7 +119,7 @@ int xfs_dir (char *dirname, void (*handle)(char *));
 #define FSYS_TFTP_NUM 1
 int tftp_mount (void);
 int tftp_read (char *buf, int len);
-int tftp_dir (char *dirname, void (*handle)(char *));
+int tftp_dir (char *dirname);
 void tftp_close (void);
 #else
 #define FSYS_TFTP_NUM 0
@@ -129,7 +129,7 @@ void tftp_close (void);
 #define FSYS_ISO9660_NUM 1
 int iso9660_mount (void);
 int iso9660_read (char *buf, int len);
-int iso9660_dir (char *dirname, void (*handle)(char *));
+int iso9660_dir (char *dirname);
 #else
 #define FSYS_ISO9660_NUM 0
 #endif
@@ -160,10 +160,16 @@ struct fsys_entry
   char *name;
   int (*mount_func) (void);
   int (*read_func) (char *buf, int len);
-  int (*dir_func) (char *dirname, void (*print_one)(char *));
+  int (*dir_func) (char *dirname);
   void (*close_func) (void);
   int (*embed_func) (int *start_sector, int needed_sectors);
 };
+
+#ifdef STAGE1_5
+# define print_possibilities 0
+#else
+extern int print_possibilities;
+#endif
 
 extern int fsmax;
 extern struct fsys_entry fsys_table[NUM_FSYS + 1];

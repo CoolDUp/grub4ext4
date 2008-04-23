@@ -270,7 +270,7 @@ jfs_read (char *buf, int len)
 }
 
 int
-jfs_dir (char *dirname, void (*handle)(char *))
+jfs_dir (char *dirname)
 {
 	char *ptr, *rest, ch;
 	ldtentry_t *de;
@@ -357,9 +357,12 @@ jfs_dir (char *dirname, void (*handle)(char *))
 
 			cmp = (!*dirname) ? -1 : substring (dirname, namebuf);
 #ifndef STAGE1_5
-			if (handle && ch != '/' && cmp <= 0)
-				handle (namebuf);
-			else
+			if (print_possibilities && ch != '/'
+			    && cmp <= 0) {
+				if (print_possibilities > 0)
+					print_possibilities = -print_possibilities;
+				print_a_completion (namebuf);
+			} else
 #endif
 			if (cmp == 0) {
 				parent_inum = inum;
@@ -369,6 +372,9 @@ jfs_dir (char *dirname, void (*handle)(char *))
 			}
 			de = next_dentry ();
 			if (de == NULL) {
+				if (print_possibilities < 0)
+					return 1;
+
 				errnum = ERR_FILE_NOT_FOUND;
 				*rest = ch;
 				return 0;
