@@ -36,6 +36,7 @@ void (*disk_read_hook) (int, int, int) = NULL;
 void (*disk_read_func) (int, int, int) = NULL;
 
 #ifndef STAGE1_5
+int print_possibilities;
 
 static int do_completion;
 static int unique;
@@ -1478,7 +1479,7 @@ print_completions (int is_filename, int is_completion)
 	  if (! is_completion)
 	    grub_printf (" Possible files are:");
 	  
-	  dir (buf, print_a_completion);
+	  dir (buf);
 	  
 	  if (is_completion && *unique_string)
 	    {
@@ -1497,7 +1498,7 @@ print_completions (int is_filename, int is_completion)
 		  *ptr = '/';
 		  *(ptr + 1) = 0;
 		  
-		  dir (buf, print_a_completion);
+		  dir (buf);
 		  
 		  /* Restore the original unique value.  */
 		  unique = 1;
@@ -1625,7 +1626,12 @@ grub_open (char *filename)
   if (!errnum && fsys_type == NUM_FSYS)
     errnum = ERR_FSYS_MOUNT;
 
-  if (!errnum && (*(fsys_table[fsys_type].dir_func)) (filename, NULL))
+# ifndef STAGE1_5
+  /* set "dir" function to open a file */
+  print_possibilities = 0;
+# endif
+
+  if (!errnum && (*(fsys_table[fsys_type].dir_func)) (filename))
     {
 #ifndef NO_DECOMPRESSION
       return gunzip_test_header ();
@@ -1746,7 +1752,7 @@ grub_seek (int offset)
 }
 
 int
-dir (char *dirname, void (*handle)(char *))
+dir (char *dirname)
 {
 #ifndef NO_DECOMPRESSION
   compressed_file = 0;
@@ -1755,18 +1761,19 @@ dir (char *dirname, void (*handle)(char *))
   if (!(dirname = setup_part (dirname)))
     return 0;
 
-  errnum = 0;
   if (*dirname != '/')
     errnum = ERR_BAD_FILENAME;
-  else if (fsys_type == NUM_FSYS)
+
+  if (fsys_type == NUM_FSYS)
     errnum = ERR_FSYS_MOUNT;
-  else
-    {
-      fsys_table[fsys_type].dir_func (dirname, handle);
-      if (errnum == ERR_FILE_NOT_FOUND)
-	errnum = 0;
-    }
-  return errnum == 0;
+
+  if (errnum)
+    return 0;
+
+  /* set "dir" function to list completions */
+  print_possibilities = 1;
+
+  return (*(fsys_table[fsys_type].dir_func)) (dirname);
 }
 #endif /* STAGE1_5 */
 

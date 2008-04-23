@@ -180,7 +180,7 @@ ffs_read (char *buf, int len)
 
 
 int
-ffs_dir (char *dirname, void (*handle)(char *))
+ffs_dir (char *dirname)
 {
   char *rest, ch;
   int block, off, loc, map, ino = ROOTINO;
@@ -236,6 +236,13 @@ loop:
     {
       if (loc >= INODE->i_size)
 	{
+#if 0
+	  putchar ('\n');
+#endif
+
+	  if (print_possibilities < 0)
+	    return 1;
+
 	  errnum = ERR_FILE_NOT_FOUND;
 	  *rest = ch;
 	  return 0;
@@ -260,13 +267,18 @@ loop:
       loc += dp->d_reclen;
 
 #ifndef STAGE1_5
-      if (dp->d_ino && handle && ch != '/'
+      if (dp->d_ino && print_possibilities && ch != '/'
 	  && (!*dirname || substring (dirname, dp->d_name) <= 0))
-	handle (dp->d_name);
+	{
+	  if (print_possibilities > 0)
+	    print_possibilities = -print_possibilities;
+
+	  print_a_completion (dp->d_name);
+	}
 #endif /* STAGE1_5 */
     }
   while (!dp->d_ino || (substring (dirname, dp->d_name) != 0
-			|| (handle && ch != '/')));
+			|| (print_possibilities && ch != '/')));
 
   /* only get here if we have a matching directory entry */
 

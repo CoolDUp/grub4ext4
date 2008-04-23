@@ -991,7 +991,7 @@ reiserfs_read (char *buf, int len)
  *   the size of the file.
  */
 int
-reiserfs_dir (char *dirname, void (*handle)(char *))
+reiserfs_dir (char *dirname)
 {
   struct reiserfs_de_head *de_head;
   char *rest, ch;
@@ -1123,7 +1123,7 @@ reiserfs_dir (char *dirname, void (*handle)(char *))
       *rest = 0;
       
 # ifndef STAGE1_5
-      if (handle && ch != '/')
+      if (print_possibilities && ch != '/')
 	do_possibilities = 1;
 # endif /* ! STAGE1_5 */
       
@@ -1170,8 +1170,10 @@ reiserfs_dir (char *dirname, void (*handle)(char *))
 		    {
 		      if (cmp <= 0)
 			{
+			  if (print_possibilities > 0)
+			    print_possibilities = -print_possibilities;
 			  *name_end = 0;
-			  handle (filename);
+			  print_a_completion (filename);
 			  *name_end = tmp;
 			}
 		    }
@@ -1187,6 +1189,12 @@ reiserfs_dir (char *dirname, void (*handle)(char *))
 	      num_entries--;
 	    }
 	}
+      
+# ifndef STAGE1_5
+      if (print_possibilities < 0)
+	return 1;
+# endif /* ! STAGE1_5 */
+      
       errnum = ERR_FILE_NOT_FOUND;
       *rest = ch;
       return 0;

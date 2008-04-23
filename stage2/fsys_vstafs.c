@@ -115,7 +115,7 @@ vstafs_nextdir (void)
 }
 
 int 
-vstafs_dir (char *dirname, void (*handle)(char *))
+vstafs_dir (char *dirname)
 {
   char *fn, ch;
   struct dir_entry *d;
@@ -146,9 +146,14 @@ vstafs_dir (char *dirname, void (*handle)(char *))
 	    continue;
 	  
 #ifndef STAGE1_5
-	  if (handle && ch != '/'
+	  if (print_possibilities && ch != '/'
 	      && (! *dirname || strcmp (dirname, d->name) <= 0))
-	    handle(d->name);
+	    {
+	      if (print_possibilities > 0)
+		print_possibilities = -print_possibilities;
+	      
+	      printf ("  %s", d->name);
+	    }
 #endif
 	  if (! grub_strcmp (dirname, d->name))
 	    {
@@ -163,6 +168,12 @@ vstafs_dir (char *dirname, void (*handle)(char *))
       *(dirname = fn) = ch;
       if (! d)
 	{
+	  if (print_possibilities < 0)
+	    {
+	      putchar ('\n');
+	      return 1;
+	    }
+	  
 	  errnum = ERR_FILE_NOT_FOUND;
 	  return 0;
 	}

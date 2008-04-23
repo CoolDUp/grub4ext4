@@ -294,7 +294,7 @@ minix_read (char *buf, int len)
      inode of the file we were trying to look up
    side effects: none yet  */
 int
-minix_dir (char *dirname, void (*handle)(char *))
+minix_dir (char *dirname)
 {
   int current_ino = MINIX_ROOT_INO;  /* start at the root */
   int updir_ino = current_ino;	     /* the parent of the current directory */
@@ -457,9 +457,18 @@ minix_dir (char *dirname, void (*handle)(char *))
 	     give up */
 	  if (loc >= INODE->i_size)
 	    {
-	      errnum = ERR_FILE_NOT_FOUND;
-	      *rest = ch;
-	      return 0;
+	      if (print_possibilities < 0)
+		{
+#if 0
+		  putchar ('\n');
+#endif
+		}
+	      else
+		{
+		  errnum = ERR_FILE_NOT_FOUND;
+		  *rest = ch;
+		}
+	      return (print_possibilities < 0);
 	    }
 
 	  /* else, find the (logical) block component of our location */
@@ -501,15 +510,20 @@ minix_dir (char *dirname, void (*handle)(char *))
 	      str_chk = substring (dirname, dp->name);
 
 # ifndef STAGE1_5
-	      if (handle && ch != '/' && (!*dirname || str_chk <= 0))
-		handle (dp->name);
+	      if (print_possibilities && ch != '/'
+		  && (!*dirname || str_chk <= 0))
+		{
+		  if (print_possibilities > 0)
+		    print_possibilities = -print_possibilities;
+		  print_a_completion (dp->name);
+		}
 # endif
 
 	      dp->name[namelen] = saved_c;
 	    }
 
 	}
-      while (!dp->inode || (str_chk || (handle && ch != '/')));
+      while (!dp->inode || (str_chk || (print_possibilities && ch != '/')));
 
       current_ino = dp->inode;
       *(dirname = rest) = ch;

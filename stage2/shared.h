@@ -1006,7 +1006,7 @@ void grub_close (void);
 
 /* List the contents of the directory that was opened with GRUB_OPEN,
    printing all completions. */
-int dir (char *dirname, void (*handle)(char *));
+int dir (char *dirname);
 
 int set_bootdev (int hdbias);
 

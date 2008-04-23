@@ -289,7 +289,7 @@ fat_read (char *buf, int len)
 }
 
 int
-fat_dir (char *dirname, void (*handle)(char *))
+fat_dir (char *dirname)
 {
   char *rest, ch, dir_buf[FAT_DIRENTRY_LENGTH];
   char *filename = (char *) NAME_BUF;
@@ -345,7 +345,7 @@ fat_dir (char *dirname, void (*handle)(char *))
   *rest = 0;
   
 # ifndef STAGE1_5
-  if (handle && ch != '/')
+  if (print_possibilities && ch != '/')
     do_possibilities = 1;
 # endif
   
@@ -356,6 +356,16 @@ fat_dir (char *dirname, void (*handle)(char *))
 	{
 	  if (!errnum)
 	    {
+# ifndef STAGE1_5
+	      if (print_possibilities < 0)
+		{
+#if 0
+		  putchar ('\n');
+#endif
+		  return 1;
+		}
+# endif /* STAGE1_5 */
+	      
 	      errnum = ERR_FILE_NOT_FOUND;
 	      *rest = ch;
 	    }
@@ -450,7 +460,11 @@ fat_dir (char *dirname, void (*handle)(char *))
 	{
 	print_filename:
 	  if (substring (dirname, filename) <= 0)
-	    handle (filename);
+	    {
+	      if (print_possibilities > 0)
+		print_possibilities = -print_possibilities;
+	      print_a_completion (filename);
+	    }
 	  continue;
 	}
 # endif /* STAGE1_5 */

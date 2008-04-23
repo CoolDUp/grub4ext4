@@ -409,7 +409,7 @@ tftp_read (char *addr, int size)
 /* Check if the file DIRNAME really exists. Get the size and save it in
    FILEMAX.  */
 int
-tftp_dir (char *dirname, void (*handle)(char *))
+tftp_dir (char *dirname)
 {
   int ch;
 
@@ -418,7 +418,7 @@ tftp_dir (char *dirname, void (*handle)(char *))
 #endif
   
   /* In TFTP, there is no way to know what files exist.  */
-  if (handle)
+  if (print_possibilities)
     return 1;
 
   /* Don't know the size yet.  */
