@@ -292,10 +292,10 @@ struct ext2_dir_entry
  */
 struct ext4_extent 
   {
-	__le32  ee_block;   /* first logical block extent covers */
-	__le16  ee_len;     /* number of blocks covered by extent */
-	__le16  ee_start_hi;    /* high 16 bits of physical block */
-	__le32  ee_start_lo;    /* low 32 bits of physical block */
+	__u32  ee_block;   /* first logical block extent covers */
+	__u16  ee_len;     /* number of blocks covered by extent */
+	__u16  ee_start_hi;    /* high 16 bits of physical block */
+	__u32  ee_start_lo;    /* low 32 bits of physical block */
   };
 
 /*
@@ -304,11 +304,11 @@ struct ext4_extent
  */
 struct ext4_extent_idx 
   {
-    __le32  ei_block;   /* index covers logical blocks from 'block' */
-    __le32  ei_leaf_lo; /* pointer to the physical block of the next *
+    __u32  ei_block;   /* index covers logical blocks from 'block' */
+    __u32  ei_leaf_lo; /* pointer to the physical block of the next *
 	                     * level. leaf or next index could be there */
-    __le16  ei_leaf_hi; /* high 16 bits of physical block */
-    __u16   ei_unused;
+    __u16  ei_leaf_hi; /* high 16 bits of physical block */
+    __u16  ei_unused;
   };
 
 /*
@@ -316,11 +316,11 @@ struct ext4_extent_idx
  */
 struct ext4_extent_header 
   {
-    __le16  eh_magic;   /* probably will support different formats */
-    __le16  eh_entries; /* number of valid entries */
-    __le16  eh_max;     /* capacity of store in entries */
-    __le16  eh_depth;   /* has tree real underlying blocks? */
-    __le32  eh_generation;  /* generation of the tree */
+    __u16  eh_magic;   /* probably will support different formats */
+    __u16  eh_entries; /* number of valid entries */
+    __u16  eh_max;     /* capacity of store in entries */
+    __u16  eh_depth;   /* has tree real underlying blocks? */
+    __u32  eh_generation;  /* generation of the tree */
   };
 
 /*
@@ -330,7 +330,7 @@ struct ext4_extent_header
  */
 struct ext4_ext_path 
   {
-	ext4_fsblk_t		p_block;
+	__u64				p_block;
 	__u16				p_depth;
 	struct ext4_extent			*p_ext;
 	struct ext4_extent_idx		*p_idx;
@@ -346,9 +346,9 @@ struct ext4_ext_path
     ((struct ext4_extent_idx *) (((char *) (__hdr__)) + \
                  sizeof(struct ext4_extent_header)))
 #define EXT_LAST_EXTENT(__hdr__) \
-    (EXT_FIRST_EXTENT((__hdr__)) + le16_to_cpu((__hdr__)->eh_entries) - 1)
+    (EXT_FIRST_EXTENT((__hdr__)) + (__u16)((__hdr__)->eh_entries) - 1)
 #define EXT_LAST_INDEX(__hdr__) \
-    (EXT_FIRST_INDEX((__hdr__)) + le16_to_cpu((__hdr__)->eh_entries) - 1)
+    (EXT_FIRST_INDEX((__hdr__)) + (__u16)((__hdr__)->eh_entries) - 1)
 /*}}}*/
 
 
@@ -459,16 +459,16 @@ ext2_rdfsb (int fsblock, int buffer)
 
 /* Read on-disk data pointed by ext4_extent into BUFFER */
 /* TODO: if ext4_get_blocks_wrap imported, this could be dismissed */
-static int
-ext4_rdfsb (struct ext4_extent* ee, int buffer)
-{
+//static int
+//ext4_rdfsb (struct ext4_extent* ee, int buffer)
+//{
 #ifdef E2DEBUG
-  printf("extent: logical blocks=%d;\t length=%d\n", ee->ee_block, ee->ee_len);
+//  printf("extent: logical blocks=%d;\t length=%d\n", ee->ee_block, ee->ee_len);
 #endif /* E2DEBUG */
   /* precondition: should check ee->ei_leaf_hi and throw an error if it's nonzero*/
-  return devread ((int)ext_pblock(ee) * (EXT2_BLOCK_SIZE (SUPERBLOCK) / DEV_BSIZE), 0,
-          ee->ee_len, (char *) buffer);
-}
+// return devread ((int)ext_pblock(ee) * (EXT2_BLOCK_SIZE (SUPERBLOCK) / DEV_BSIZE), 0,
+//          ee->ee_len, (char *) buffer);
+//}
 
 
 /* from
@@ -607,8 +607,8 @@ static struct ext4_extent*
 ext4_ext_binsearch(struct ext4_extent_header* eh, int logical_block)
 {/*{{{*/
   struct ext4_extent *r, *l, *m;
-  l = EXT_FIRST_INDEX(eh) + 1;
-  r = EXT_LAST_INDEX(eh);
+  l = EXT_FIRST_EXTENT(eh) + 1;
+  r = EXT_LAST_EXTENT(eh);
   while (l <= r) 
     {
 	  m = l + (r - l) / 2;
@@ -629,9 +629,8 @@ ext4fs_block_map (int logical_block)
 {/*{{{*/
   struct ext4_extent_header *eh;
   struct ext4_extent *ex;
-  struct ext4_extent_index* ei;
-  __u64 pblk;
-  int depth, entry, ret;
+  struct ext4_extent_idx *ei;
+  int depth;
 
 #ifdef E2DEBUG
   unsigned char *i;
@@ -652,8 +651,8 @@ ext4fs_block_map (int logical_block)
     }
   printf ("logical block %d\n", logical_block);
 #endif /* E2DEBUG */
-  eh = (struct ext4_extent_header*)INODE->block;
-  while(depth = eh->eh_depth)
+  eh = (struct ext4_extent_header*)INODE->i_block;
+  while((depth = eh->eh_depth) != 0)
   	{ /* extent index */
 	  ei = ext4_ext_binsearch_idx(eh, logical_block);
 	  if (ei->ei_leaf_hi)
@@ -662,7 +661,7 @@ ext4fs_block_map (int logical_block)
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
-	  if (!ext2_rdfsb(ei->ei_leaf_hi, DATABLOCK1))
+	  if (!ext2_rdfsb(ei->ei_leaf_lo, DATABLOCK1))
 	{
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
@@ -678,12 +677,12 @@ ext4fs_block_map (int logical_block)
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
-  if ((ee_block+ee_len) < logical_block)
+  if ((ex->ee_block + ex->ee_len) < logical_block)
 	{
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
-  return ex->ee_start_lo + logical_block - ee_block;
+  return ex->ee_start_lo + logical_block - ex->ee_block;
 
 }/*}}}*/
 
@@ -721,7 +720,7 @@ ext2fs_read (char *buf, int len)
       /* find the (logical) block component of our location */
       logical_block = filepos >> EXT2_BLOCK_SIZE_BITS (SUPERBLOCK);
       offset = filepos & (EXT2_BLOCK_SIZE (SUPERBLOCK) - 1);
-	  if (INODE->i_flags & EXT4_EXTENT_FL)
+	  if (INODE->i_flags & EXT4_EXTENTS_FL)
 		  map = ext4fs_block_map (logical_block);
 	  else
       	  map = ext2fs_block_map (logical_block);
@@ -1051,7 +1050,7 @@ ext2fs_dir (char *dirname)
 	     for, now we have to translate that to the physical (fs) block on
 	     the disk */
 	  /* TODO: map extents enabled logical block number to physical fs on-dick block number */
-	  if (INODE->i_flags & EXT4_EXTENT_FL)
+	  if (INODE->i_flags & EXT4_EXTENTS_FL)
 		  map = ext4fs_block_map (blk);
 	  else
 	  	  map = ext2fs_block_map (blk);
