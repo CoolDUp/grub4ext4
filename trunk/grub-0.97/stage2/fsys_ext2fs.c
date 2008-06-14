@@ -442,7 +442,12 @@ ext2fs_mount (void)
 		   (char *) SUPERBLOCK)
       || SUPERBLOCK->s_magic != EXT2_SUPER_MAGIC)
       retval = 0;
-
+#ifdef E2DEBUG
+  /* TODO: print superblock information */
+  printf("block size=%d\n", EXT2_BLOCK_SIZE(SUPERBLOCK));
+  printf("inode size=%d\n", EXT2_INODE_SIZE(SUPERBLOCK));
+  printf("block group size=%d\n", EXT2_DESC_PER_BLOCK(SUPERBLOCK));
+#endif /* E2DEBUG */
   return retval;
 }/*}}}*/
 
@@ -658,6 +663,7 @@ ext4fs_block_map (int logical_block)
 	  if (ei->ei_leaf_hi)
 	{/* 48bit physical block number not supported yet */
 	 /* TODO: find an error to deny 48-bit physical block number */
+	  printf("ei->ei_leaf_hi nonzero\n");
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
@@ -674,6 +680,7 @@ ext4fs_block_map (int logical_block)
   if (ex->ee_start_hi) 
 	{/* 48bit physical block number not supported yet */
 	 /* TODO: find an error to deny 48-bit physical block number */
+	  printf("ex->ee_start_hi nonzero\n");
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
@@ -720,7 +727,8 @@ ext2fs_read (char *buf, int len)
       /* find the (logical) block component of our location */
       logical_block = filepos >> EXT2_BLOCK_SIZE_BITS (SUPERBLOCK);
       offset = filepos & (EXT2_BLOCK_SIZE (SUPERBLOCK) - 1);
-	  if (INODE->i_flags & EXT4_EXTENTS_FL)
+	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
+			&& INODE->i_flags & EXT4_EXTENTS_FL)
 		  map = ext4fs_block_map (logical_block);
 	  else
       	  map = ext2fs_block_map (logical_block);
@@ -985,6 +993,7 @@ ext2fs_dir (char *dirname)
 	  /* if file is too large, just stop and report an error*/
 	  if ( (INODE->i_flags & EXT4_HUGE_FILE_FL) && !(INODE->i_size_high))
 	    {
+		  printf("file too large, don't read it\n");
 		  /* TODO: find a new errnum for large files */
 		  errnum = ERR_FILELENGTH;
 		  return 0;
@@ -1050,7 +1059,8 @@ ext2fs_dir (char *dirname)
 	     for, now we have to translate that to the physical (fs) block on
 	     the disk */
 	  /* TODO: map extents enabled logical block number to physical fs on-dick block number */
-	  if (INODE->i_flags & EXT4_EXTENTS_FL)
+	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
+			&& INODE->i_flags & EXT4_EXTENTS_FL)
 		  map = ext4fs_block_map (blk);
 	  else
 	  	  map = ext2fs_block_map (blk);
