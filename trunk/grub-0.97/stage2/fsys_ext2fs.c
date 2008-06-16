@@ -148,16 +148,16 @@ struct ext2_group_desc
     __u16 bg_free_blocks_count;	/* Free blocks count */
     __u16 bg_free_inodes_count;	/* Free inodes count */
     __u16 bg_used_dirs_count;	/* Directories count */
-	__u16	bg_flags;		/* EXT4_BG_flags (INODE_UNINIT, etc) */
-	__u32	bg_reserved[2];		/* Likely block/inode bitmap checksum */
-	__u16  bg_itable_unused;	/* Unused inodes count */
-	__u16  bg_checksum;		/* crc16(sb_uuid+group+desc) */
-	__u32	bg_block_bitmap_hi;	/* Blocks bitmap block MSB */
-	__u32	bg_inode_bitmap_hi;	/* Inodes bitmap block MSB */
-	__u32	bg_inode_table_hi;	/* Inodes table block MSB */
-	__u16	bg_free_blocks_count_hi;/* Free blocks count MSB */
-	__u16	bg_free_inodes_count_hi;/* Free inodes count MSB */
-	__u16	bg_used_dirs_count_hi;	/* Directories count MSB */
+//	__u16	bg_flags;		/* EXT4_BG_flags (INODE_UNINIT, etc) */
+//	__u32	bg_reserved[2];		/* Likely block/inode bitmap checksum */
+//	__u16  bg_itable_unused;	/* Unused inodes count */
+//	__u16  bg_checksum;		/* crc16(sb_uuid+group+desc) */
+//	__u32	bg_block_bitmap_hi;	/* Blocks bitmap block MSB */
+//	__u32	bg_inode_bitmap_hi;	/* Inodes bitmap block MSB */
+//	__u32	bg_inode_table_hi;	/* Inodes table block MSB */
+//	__u16	bg_free_blocks_count_hi;/* Free blocks count MSB */
+//	__u16	bg_free_inodes_count_hi;/* Free inodes count MSB */
+//	__u16	bg_used_dirs_count_hi;	/* Directories count MSB */
 	__u16	bg_itable_unused_hi;	/* Unused inodes count MSB */
     __u32 bg_reserved2[3];
   };/*}}}*/
@@ -259,7 +259,7 @@ struct ext2_inode
 #define EXT4_FEATURE_INCOMPAT_JOURNAL_DEV	0x0008 /* Journal device */
 #define EXT4_FEATURE_INCOMPAT_META_BG		0x0010
 #define EXT4_FEATURE_INCOMPAT_EXTENTS		0x0040 /* extents support */
-#define EXT4_FEATURE_INCOMPAT_64BIT			0x0080
+#define EXT4_FEATURE_INCOMPAT_64BIT			0x0080 /* bergwolf:grub not supported*/
 #define EXT4_FEATURE_INCOMPAT_MMP           0x0100
 #define EXT4_FEATURE_INCOMPAT_FLEX_BG		0x0200
 
@@ -268,6 +268,9 @@ struct ext2_inode
 
 #define EXT4_EXTENTS_FL		0x00080000 /* Inode uses extents */
 #define EXT4_HUGE_FILE_FL	0x00040000 /* Set to each huge file *//*}}}*/
+
+#define EXT4_MIN_DESC_SIZE			32
+#define EXT4_MIN_DESC_SIZE_64BIT	64
 
 /* linux/limits.h */
 #define NAME_MAX         255	/* # chars in a file name */
@@ -398,8 +401,18 @@ struct ext4_ext_path
 /* kind of from ext2/super.c */
 #define EXT2_BLOCK_SIZE(s)	(1 << EXT2_BLOCK_SIZE_BITS(s))
 /* linux/ext2fs.h */
+/* TODO: sizeof(struct ext2_group_desc) is changed 
+ * superblock->s_desc_size is not available in ext2/3
+ * what to do??
+ * */
+/* in kernel code, ext2/3 uses sizeof(struct ext2_group_desc) to calculate 
+ * number of desc per block, while ext4 uses superblock->s_desc_size in stead
+ * how to deal with it?
+ * */
+#define EXT2_DESC_SIZE  EXT4_MIN_DESC_SIZE
 #define EXT2_DESC_PER_BLOCK(s) \
-     (EXT2_BLOCK_SIZE(s) / sizeof (struct ext2_group_desc))
+     (EXT2_BLOCK_SIZE(s) / EXT2_DESC_SIZE)
+
 /* linux/stat.h */
 #define S_IFMT  00170000
 #define S_IFLNK  0120000
@@ -442,12 +455,7 @@ ext2fs_mount (void)
 		   (char *) SUPERBLOCK)
       || SUPERBLOCK->s_magic != EXT2_SUPER_MAGIC)
       retval = 0;
-#ifdef E2DEBUG
-  /* TODO: print superblock information */
-  printf("block size=%d\n", EXT2_BLOCK_SIZE(SUPERBLOCK));
-  printf("inode size=%d\n", EXT2_INODE_SIZE(SUPERBLOCK));
-  printf("block group size=%d\n", EXT2_DESC_PER_BLOCK(SUPERBLOCK));
-#endif /* E2DEBUG */
+
   return retval;
 }/*}}}*/
 
@@ -663,7 +671,6 @@ ext4fs_block_map (int logical_block)
 	  if (ei->ei_leaf_hi)
 	{/* 48bit physical block number not supported yet */
 	 /* TODO: find an error to deny 48-bit physical block number */
-	  printf("ei->ei_leaf_hi nonzero\n");
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
@@ -680,7 +687,6 @@ ext4fs_block_map (int logical_block)
   if (ex->ee_start_hi) 
 	{/* 48bit physical block number not supported yet */
 	 /* TODO: find an error to deny 48-bit physical block number */
-	  printf("ex->ee_start_hi nonzero\n");
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
@@ -727,6 +733,7 @@ ext2fs_read (char *buf, int len)
       /* find the (logical) block component of our location */
       logical_block = filepos >> EXT2_BLOCK_SIZE_BITS (SUPERBLOCK);
       offset = filepos & (EXT2_BLOCK_SIZE (SUPERBLOCK) - 1);
+	  /* TODO: map extents enabled logical block number to physical fs on-dick block number */
 	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
 			&& INODE->i_flags & EXT4_EXTENTS_FL)
 		  map = ext4fs_block_map (logical_block);
@@ -993,7 +1000,6 @@ ext2fs_dir (char *dirname)
 	  /* if file is too large, just stop and report an error*/
 	  if ( (INODE->i_flags & EXT4_HUGE_FILE_FL) && !(INODE->i_size_high))
 	    {
-		  printf("file too large, don't read it\n");
 		  /* TODO: find a new errnum for large files */
 		  errnum = ERR_FILELENGTH;
 		  return 0;
