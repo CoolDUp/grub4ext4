@@ -148,17 +148,29 @@ struct ext2_group_desc
     __u16 bg_free_blocks_count;	/* Free blocks count */
     __u16 bg_free_inodes_count;	/* Free inodes count */
     __u16 bg_used_dirs_count;	/* Directories count */
-//	__u16	bg_flags;		/* EXT4_BG_flags (INODE_UNINIT, etc) */
-//	__u32	bg_reserved[2];		/* Likely block/inode bitmap checksum */
-//	__u16  bg_itable_unused;	/* Unused inodes count */
-//	__u16  bg_checksum;		/* crc16(sb_uuid+group+desc) */
-//	__u32	bg_block_bitmap_hi;	/* Blocks bitmap block MSB */
-//	__u32	bg_inode_bitmap_hi;	/* Inodes bitmap block MSB */
-//	__u32	bg_inode_table_hi;	/* Inodes table block MSB */
-//	__u16	bg_free_blocks_count_hi;/* Free blocks count MSB */
-//	__u16	bg_free_inodes_count_hi;/* Free inodes count MSB */
-//	__u16	bg_used_dirs_count_hi;	/* Directories count MSB */
-	__u16	bg_itable_unused_hi;	/* Unused inodes count MSB */
+	__u16 bg_itable_unused_hi;	/* Unused inodes count MSB */
+    __u32 bg_reserved2[3];
+  };/*}}}*/
+
+struct ext4_group_desc
+  {/*{{{*/
+    __u32 bg_block_bitmap;	/* Blocks bitmap block */
+    __u32 bg_inode_bitmap;	/* Inodes bitmap block */
+    __u32 bg_inode_table;	/* Inodes table block */
+    __u16 bg_free_blocks_count;	/* Free blocks count */
+    __u16 bg_free_inodes_count;	/* Free inodes count */
+    __u16 bg_used_dirs_count;	/* Directories count */
+	__u16 bg_flags;		/* EXT4_BG_flags (INODE_UNINIT, etc) */
+	__u32 bg_reserved[2];		/* Likely block/inode bitmap checksum */
+	__u16 bg_itable_unused;	/* Unused inodes count */
+	__u16 bg_checksum;		/* crc16(sb_uuid+group+desc) */
+	__u32 bg_block_bitmap_hi;	/* Blocks bitmap block MSB */
+	__u32 bg_inode_bitmap_hi;	/* Inodes bitmap block MSB */
+	__u32 bg_inode_table_hi;	/* Inodes table block MSB */
+	__u16 bg_free_blocks_count_hi;/* Free blocks count MSB */
+	__u16 bg_free_inodes_count_hi;/* Free inodes count MSB */
+	__u16 bg_used_dirs_count_hi;	/* Directories count MSB */
+	__u16 bg_itable_unused_hi;	/* Unused inodes count MSB */
     __u32 bg_reserved2[3];
   };/*}}}*/
 
@@ -401,17 +413,16 @@ struct ext4_ext_path
 /* kind of from ext2/super.c */
 #define EXT2_BLOCK_SIZE(s)	(1 << EXT2_BLOCK_SIZE_BITS(s))
 /* linux/ext2fs.h */
-/* TODO: sizeof(struct ext2_group_desc) is changed 
- * superblock->s_desc_size is not available in ext2/3
- * what to do??
- * */
-/* in kernel code, ext2/3 uses sizeof(struct ext2_group_desc) to calculate 
+/* TODO: sizeof(struct ext2_group_desc) is changed in ext4 
+ * in kernel code, ext2/3 uses sizeof(struct ext2_group_desc) to calculate 
  * number of desc per block, while ext4 uses superblock->s_desc_size in stead
- * how to deal with it?
+ * superblock->s_desc_size is not available in ext2/3
  * */
-#define EXT2_DESC_SIZE  EXT4_MIN_DESC_SIZE
+#define EXT2_DESC_SIZE(s) \
+	EXT4_HAS_INCOMPAT_FEATURE(s,EXT4_FEATURE_INCOMPAT_64BIT)? \
+	s->s_desc_size : EXT4_MIN_DESC_SIZE
 #define EXT2_DESC_PER_BLOCK(s) \
-     (EXT2_BLOCK_SIZE(s) / EXT2_DESC_SIZE)
+	(EXT2_BLOCK_SIZE(s) / (EXT2_DESC_SIZE(s)))
 
 /* linux/stat.h */
 #define S_IFMT  00170000
@@ -670,8 +681,8 @@ ext4fs_block_map (int logical_block)
 	  ei = ext4_ext_binsearch_idx(eh, logical_block);
 	  if (ei->ei_leaf_hi)
 	{/* 48bit physical block number not supported yet */
-	 /* TODO: find an error to deny 48-bit physical block number */
-	  errnum = ERR_FSYS_CORRUPT;
+	 /* TODO: find an error number to deny 48-bit physical block number */
+	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
 	  if (!ext2_rdfsb(ei->ei_leaf_lo, DATABLOCK1))
@@ -686,8 +697,8 @@ ext4fs_block_map (int logical_block)
   ex = ext4_ext_binsearch(eh, logical_block);
   if (ex->ee_start_hi) 
 	{/* 48bit physical block number not supported yet */
-	 /* TODO: find an error to deny 48-bit physical block number */
-	  errnum = ERR_FSYS_CORRUPT;
+	 /* TODO: find an error number to deny 48-bit physical block number */
+	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
   if ((ex->ee_block + ex->ee_len) < logical_block)
@@ -823,6 +834,7 @@ ext2fs_dir (char *dirname)
   int ino_blk;			/* fs pointer of the inode's information */
   int str_chk = 0;		/* used to hold the results of a string compare */
   struct ext2_group_desc *gdp;
+  struct ext4_group_desc *ext4_gdp;
   struct ext2_inode *raw_inode;	/* inode info corresponding to current_ino */
 
   char linkbuf[PATH_MAX];	/* buffer for following symbolic links */
@@ -868,10 +880,29 @@ ext2fs_dir (char *dirname)
 	{
 	  return 0;
 	}
+	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK, EXT4_FEATURE_INCOMPAT_64BIT))
+	{
+	  ext4_gdp = GROUP_DESC;
+	  /* TODO:what to do with ext4_group_desc.bg_inode_table_hi? 
+	   * should refuse it because it means physical block number larger than 32bit
+	   * */
+	  if (!ext4_gdp[desc].bg_inode_table_hi)
+	{/* 48bit physical block number not supported yet */
+	 /* TODO: find an error number to deny 48-bit physical block number */
+	  errnum = ERR_FILELENGTH;
+	  return -1;
+	}
+      ino_blk = ext4_gdp[desc].bg_inode_table +
+	(((current_ino - 1) % (SUPERBLOCK->s_inodes_per_group))
+	 >> grub_log2 (EXT2_INODES_PER_BLOCK (SUPERBLOCK)));
+	}
+	else
+	{
       gdp = GROUP_DESC;
       ino_blk = gdp[desc].bg_inode_table +
 	(((current_ino - 1) % (SUPERBLOCK->s_inodes_per_group))
 	 >> grub_log2 (EXT2_INODES_PER_BLOCK (SUPERBLOCK)));
+	}
 #ifdef E2DEBUG
       printf ("inode table fsblock=%d\n", ino_blk);
 #endif /* E2DEBUG */
@@ -1000,7 +1031,7 @@ ext2fs_dir (char *dirname)
 	  /* if file is too large, just stop and report an error*/
 	  if ( (INODE->i_flags & EXT4_HUGE_FILE_FL) && !(INODE->i_size_high))
 	    {
-		  /* TODO: find a new errnum for large files */
+		  /* TODO: find an errnum for large files */
 		  errnum = ERR_FILELENGTH;
 		  return 0;
 	    }
