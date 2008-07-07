@@ -413,16 +413,16 @@ struct ext4_ext_path
 /* kind of from ext2/super.c */
 #define EXT2_BLOCK_SIZE(s)	(1 << EXT2_BLOCK_SIZE_BITS(s))
 /* linux/ext2fs.h */
-/* TODO: sizeof(struct ext2_group_desc) is changed in ext4 
+/* bergwolf: sizeof(struct ext2_group_desc) is changed in ext4 
  * in kernel code, ext2/3 uses sizeof(struct ext2_group_desc) to calculate 
  * number of desc per block, while ext4 uses superblock->s_desc_size in stead
  * superblock->s_desc_size is not available in ext2/3
  * */
 #define EXT2_DESC_SIZE(s) \
-	EXT4_HAS_INCOMPAT_FEATURE(s,EXT4_FEATURE_INCOMPAT_64BIT)? \
-	s->s_desc_size : EXT4_MIN_DESC_SIZE
+	(EXT4_HAS_INCOMPAT_FEATURE(s,EXT4_FEATURE_INCOMPAT_64BIT)? \
+	s->s_desc_size : EXT4_MIN_DESC_SIZE)
 #define EXT2_DESC_PER_BLOCK(s) \
-	(EXT2_BLOCK_SIZE(s) / (EXT2_DESC_SIZE(s)))
+	(EXT2_BLOCK_SIZE(s) / EXT2_DESC_SIZE(s))
 
 /* linux/stat.h */
 #define S_IFMT  00170000
@@ -480,20 +480,6 @@ ext2_rdfsb (int fsblock, int buffer)
   return devread (fsblock * (EXT2_BLOCK_SIZE (SUPERBLOCK) / DEV_BSIZE), 0,
 		  EXT2_BLOCK_SIZE (SUPERBLOCK), (char *) buffer);
 }
-
-/* Read on-disk data pointed by ext4_extent into BUFFER */
-/* TODO: if ext4_get_blocks_wrap imported, this could be dismissed */
-//static int
-//ext4_rdfsb (struct ext4_extent* ee, int buffer)
-//{
-#ifdef E2DEBUG
-//  printf("extent: logical blocks=%d;\t length=%d\n", ee->ee_block, ee->ee_len);
-#endif /* E2DEBUG */
-  /* precondition: should check ee->ei_leaf_hi and throw an error if it's nonzero*/
-// return devread ((int)ext_pblock(ee) * (EXT2_BLOCK_SIZE (SUPERBLOCK) / DEV_BSIZE), 0,
-//          ee->ee_len, (char *) buffer);
-//}
-
 
 /* from
   ext2/inode.c:ext2_bmap()
@@ -645,7 +631,7 @@ ext4_ext_binsearch(struct ext4_extent_header* eh, int logical_block)
 }/*}}}*/
 
 
-/* Maps extents enabled logical block into physical block via an inode. 
+/* bergwolf: Maps extents enabled logical block into physical block via an inode. 
  * EXT4_HUGE_FILE_FL should be checked before calling this.
  */
 static int
@@ -680,8 +666,7 @@ ext4fs_block_map (int logical_block)
   	{ /* extent index */
 	  ei = ext4_ext_binsearch_idx(eh, logical_block);
 	  if (ei->ei_leaf_hi)
-	{/* 48bit physical block number not supported yet */
-	 /* TODO: find an error number to deny 48-bit physical block number */
+	{/* bergwolf: 48bit physical block number not supported yet */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
@@ -696,8 +681,7 @@ ext4fs_block_map (int logical_block)
   /* depth==0, we come to the leaf */
   ex = ext4_ext_binsearch(eh, logical_block);
   if (ex->ee_start_hi) 
-	{/* 48bit physical block number not supported yet */
-	 /* TODO: find an error number to deny 48-bit physical block number */
+	{/* bergwolf: 48bit physical block number not supported yet */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
@@ -744,7 +728,7 @@ ext2fs_read (char *buf, int len)
       /* find the (logical) block component of our location */
       logical_block = filepos >> EXT2_BLOCK_SIZE_BITS (SUPERBLOCK);
       offset = filepos & (EXT2_BLOCK_SIZE (SUPERBLOCK) - 1);
-	  /* TODO: map extents enabled logical block number to physical fs on-dick block number */
+	  /* bergwolf: map extents enabled logical block number to physical fs on-dick block number */
 	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
 			&& INODE->i_flags & EXT4_EXTENTS_FL)
 		  map = ext4fs_block_map (logical_block);
@@ -883,12 +867,8 @@ ext2fs_dir (char *dirname)
 	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK, EXT4_FEATURE_INCOMPAT_64BIT))
 	{
 	  ext4_gdp = GROUP_DESC;
-	  /* TODO:what to do with ext4_group_desc.bg_inode_table_hi? 
-	   * should refuse it because it means physical block number larger than 32bit
-	   * */
 	  if (!ext4_gdp[desc].bg_inode_table_hi)
-	{/* 48bit physical block number not supported yet */
-	 /* TODO: find an error number to deny 48-bit physical block number */
+	{/* bergwolf: 48bit physical block number not supported yet */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
@@ -1031,7 +1011,7 @@ ext2fs_dir (char *dirname)
 	  /* if file is too large, just stop and report an error*/
 	  if ( (INODE->i_flags & EXT4_HUGE_FILE_FL) && !(INODE->i_size_high))
 	    {
-		  /* TODO: find an errnum for large files */
+		  /* bergwolf: file too large, stop reading */
 		  errnum = ERR_FILELENGTH;
 		  return 0;
 	    }
@@ -1095,7 +1075,7 @@ ext2fs_dir (char *dirname)
 	  /* we know which logical block of the directory entry we are looking
 	     for, now we have to translate that to the physical (fs) block on
 	     the disk */
-	  /* TODO: map extents enabled logical block number to physical fs on-dick block number */
+	  /* bergwolf: map extents enabled logical block number to physical fs on-dick block number */
 	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
 			&& INODE->i_flags & EXT4_EXTENTS_FL)
 		  map = ext4fs_block_map (blk);
