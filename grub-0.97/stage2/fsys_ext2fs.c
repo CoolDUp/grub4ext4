@@ -817,7 +817,6 @@ ext2fs_dir (char *dirname)
   int desc;			/* index within that group */
   int ino_blk;			/* fs pointer of the inode's information */
   int str_chk = 0;		/* used to hold the results of a string compare */
-  struct ext2_group_desc *gdp;
   struct ext4_group_desc *ext4_gdp;
   struct ext2_inode *raw_inode;	/* inode info corresponding to current_ino */
 
@@ -864,25 +863,17 @@ ext2fs_dir (char *dirname)
 	{
 	  return 0;
 	}
-	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK, EXT4_FEATURE_INCOMPAT_64BIT))
-	{
-	  ext4_gdp = GROUP_DESC;
-	  if (!ext4_gdp[desc].bg_inode_table_hi)
-	{/* bergwolf: 48bit physical block number not supported yet */
+	  ext4_gdp = (struct ext4_group_desc *)( (int)GROUP_DESC + 
+			  		desc * EXT2_DESC_SIZE(SUPERBLOCK));
+	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK, EXT4_FEATURE_INCOMPAT_64BIT)
+		&& (! ext4_gdp->bg_inode_table_hi))
+	{/* bergwolf: 64bit itable not supported yet */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
-      ino_blk = ext4_gdp[desc].bg_inode_table +
+      ino_blk = ext4_gdp->bg_inode_table + 
 	(((current_ino - 1) % (SUPERBLOCK->s_inodes_per_group))
 	 >> grub_log2 (EXT2_INODES_PER_BLOCK (SUPERBLOCK)));
-	}
-	else
-	{
-      gdp = GROUP_DESC;
-      ino_blk = gdp[desc].bg_inode_table +
-	(((current_ino - 1) % (SUPERBLOCK->s_inodes_per_group))
-	 >> grub_log2 (EXT2_INODES_PER_BLOCK (SUPERBLOCK)));
-	}
 #ifdef E2DEBUG
       printf ("inode table fsblock=%d\n", ino_blk);
 #endif /* E2DEBUG */
