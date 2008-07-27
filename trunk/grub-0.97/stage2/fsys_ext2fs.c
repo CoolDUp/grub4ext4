@@ -353,7 +353,7 @@ struct ext4_ext_path
 	struct buffer_head			*p_bh;
   };
 
-#define EXT4_EXT_MAGIC      cpu_to_le16(0xf30a)
+#define EXT4_EXT_MAGIC      (0xf30a)
 #define EXT_FIRST_EXTENT(__hdr__) \
     ((struct ext4_extent *) (((char *) (__hdr__)) +     \
                  sizeof(struct ext4_extent_header)))
@@ -592,7 +592,7 @@ ext2fs_block_map (int logical_block)
  * find closest index in the current level extent tree
  * kind of from ext4_ext_binsearch_idx in ext4/extents.c
  */
-static struct ext4_extent_index*
+static struct ext4_extent_idx*
 ext4_ext_binsearch_idx(struct ext4_extent_header* eh, int logical_block)
 {/*{{{*/
   struct ext4_extent_idx *r, *l, *m;
@@ -606,7 +606,7 @@ ext4_ext_binsearch_idx(struct ext4_extent_header* eh, int logical_block)
 	  else
 		  l = m + 1;
 	}
-  return (struct ext4_extent_index*)(l - 1);
+  return (struct ext4_extent_idx*)(l - 1);
 }/*}}}*/
 
 /* extent binary search 
@@ -630,7 +630,6 @@ ext4_ext_binsearch(struct ext4_extent_header* eh, int logical_block)
   return (struct ext4_extent*)(l - 1);
 }/*}}}*/
 
-
 /* bergwolf: Maps extents enabled logical block into physical block via an inode. 
  * EXT4_HUGE_FILE_FL should be checked before calling this.
  */
@@ -638,9 +637,10 @@ static int
 ext4fs_block_map (int logical_block)
 {/*{{{*/
   struct ext4_extent_header *eh;
-  struct ext4_extent *ex;
-  struct ext4_extent_idx *ei;
+  struct ext4_extent *ex, *extent;
+  struct ext4_extent_idx *ei, *index;
   int depth;
+  int i;
 
 #ifdef E2DEBUG
   unsigned char *i;
@@ -662,11 +662,28 @@ ext4fs_block_map (int logical_block)
   printf ("logical block %d\n", logical_block);
 #endif /* E2DEBUG */
   eh = (struct ext4_extent_header*)INODE->i_block;
+  if (eh->eh_magic != EXT4_EXT_MAGIC)
+	  return -1;
   while((depth = eh->eh_depth) != 0)
   	{ /* extent index */
-	  ei = ext4_ext_binsearch_idx(eh, logical_block);
+	  if (eh->eh_magic != EXT4_EXT_MAGIC)
+		  return -1;
+	//  ei = ext4_ext_binsearch_idx(eh, logical_block);
+	  index = EXT_FIRST_INDEX(eh);
+	  for (i = 0; i < eh->eh_entries; i++)
+	{
+		  if (logical_block < index[i].ei_block)
+			  break;
+	}
+	  if (i-- < 0)
+	{
+		errnum = ERR_FSYS_CORRUPT;
+		return -1;
+	}
+	  ei = &index[i];
+
 	  if (ei->ei_leaf_hi)
-	{/* bergwolf: 48bit physical block number not supported yet */
+	{/* bergwolf: 64bit physical block number not supported yet */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
@@ -679,7 +696,20 @@ ext4fs_block_map (int logical_block)
   	}
 
   /* depth==0, we come to the leaf */
-  ex = ext4_ext_binsearch(eh, logical_block);
+//  ex = ext4_ext_binsearch(eh, logical_block);
+  extent = EXT_FIRST_EXTENT(eh);
+  for (i = 0; i < eh->eh_entries; i++)
+	{
+	  if (logical_block < extent[i].ee_block)
+		  break;
+	}
+	  if (i-- < 0)
+	{
+		errnum = ERR_FSYS_CORRUPT;
+		return -1;
+	}
+  ex = &extent[i];
+
   if (ex->ee_start_hi) 
 	{/* bergwolf: 48bit physical block number not supported yet */
 	  errnum = ERR_FILELENGTH;
