@@ -51,6 +51,7 @@ Patch23:        stage2-wildcard-doc.diff
 Patch24:        grub-%{version}-protexec.patch
 Patch25:        pacify-autoconf
 Patch26:        grub-grubonce-no-wait
+Patch27:	ext4-support
 Url:            http://www.gnu.org/software/grub/grub.en.html
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Summary:        Grand Unified Boot Loader
@@ -80,6 +81,7 @@ Authors:
     Michael Hohmuth <hohmuth@innocent.com>
     OKUJI Yoshinori <okuji@gnu.org>
     Pavel Roskin <proski@gnu.org>
+    Bergwolf <bergwolf@gmail.com>
 
 %debug_package
 %prep
@@ -114,6 +116,7 @@ rm -f acconfig.h || true
 %patch24 -p1
 %patch25 -p1
 %patch26 -p1
+%patch27 -p1
 
 %build
 perl -pi -e 's,/usr/share/grub/i386-pc,/usr/lib/grub,' docs/grub.texi
