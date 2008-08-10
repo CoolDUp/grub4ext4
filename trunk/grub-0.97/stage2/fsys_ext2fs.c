@@ -23,7 +23,6 @@
 #include "filesys.h"
 
 static int mapblock1, mapblock2;
-static unsigned char ext_type; /* 0=ext2/3, 1=ext4 */
 
 /* sizes are always in bytes, BLOCK values are always in DEV_BSIZE (sectors) */
 #define DEV_BSIZE 512
@@ -53,9 +52,9 @@ typedef unsigned long long __u64;
 #define EXT2_TIND_BLOCK                 (EXT2_DIND_BLOCK + 1)
 #define EXT2_N_BLOCKS                   (EXT2_TIND_BLOCK + 1)
 
-/* linux/ext4_fs.h */
-struct ext2_super_block/*{{{*/
-  {/*{{{*/
+/* lib/ext2fs/ext2_fs.h from e2fsprogs */
+struct ext2_super_block
+  {
     __u32 s_inodes_count;	/* Inodes count */
     __u32 s_blocks_count;	/* Blocks count */
     __u32 s_r_blocks_count;	/* Reserved blocks count */
@@ -120,7 +119,7 @@ struct ext2_super_block/*{{{*/
 	__u32	s_last_orphan;		/* start of list of inodes to delete */
 	__u32	s_hash_seed[4];		/* HTREE hash seed */
 	__u8	s_def_hash_version;	/* Default hash version to use */
-	__u8	s_reserved_char_pad;
+	__u8	s_jnl_backup_type;	/* Default type of journal backup */
 	__u16	s_desc_size;	/* size of group descriptor */
 	__u32	s_default_mount_opts;
  	__u32	s_first_meta_bg; 	/* First metablock block group */
@@ -137,45 +136,36 @@ struct ext2_super_block/*{{{*/
 	__u16	s_mmp_interval;		/* # seconds to wait MMP checking */
 	__u64	s_mmp_block;		/* Block for multi-mount protection */
 	__u32	s_raid_stripe_width;	/* Blocks on all data disks (N*stride)*/
-	__u32	s_reserved[163];	/* Padding to the end of the block */
-  };/*}}}*/
-
-struct ext2_group_desc
-  {/*{{{*/
-    __u32 bg_block_bitmap;	/* Blocks bitmap block */
-    __u32 bg_inode_bitmap;	/* Inodes bitmap block */
-    __u32 bg_inode_table;	/* Inodes table block */
-    __u16 bg_free_blocks_count;	/* Free blocks count */
-    __u16 bg_free_inodes_count;	/* Free inodes count */
-    __u16 bg_used_dirs_count;	/* Directories count */
-	__u16 bg_itable_unused_hi;	/* Unused inodes count MSB */
-    __u32 bg_reserved2[3];
-  };/*}}}*/
+	__u8	s_log_groups_per_flex;	/* FLEX_BG group size*/
+	__u8	s_reserved_char_pad;
+	__u16	s_reserved_pad;
+	__u32	s_reserved[162];	/* Padding to the end of the block */
+  };
 
 struct ext4_group_desc
-  {/*{{{*/
+  {
     __u32 bg_block_bitmap;	/* Blocks bitmap block */
     __u32 bg_inode_bitmap;	/* Inodes bitmap block */
     __u32 bg_inode_table;	/* Inodes table block */
     __u16 bg_free_blocks_count;	/* Free blocks count */
     __u16 bg_free_inodes_count;	/* Free inodes count */
     __u16 bg_used_dirs_count;	/* Directories count */
-	__u16 bg_flags;		/* EXT4_BG_flags (INODE_UNINIT, etc) */
-	__u32 bg_reserved[2];		/* Likely block/inode bitmap checksum */
-	__u16 bg_itable_unused;	/* Unused inodes count */
-	__u16 bg_checksum;		/* crc16(sb_uuid+group+desc) */
-	__u32 bg_block_bitmap_hi;	/* Blocks bitmap block MSB */
-	__u32 bg_inode_bitmap_hi;	/* Inodes bitmap block MSB */
-	__u32 bg_inode_table_hi;	/* Inodes table block MSB */
-	__u16 bg_free_blocks_count_hi;/* Free blocks count MSB */
-	__u16 bg_free_inodes_count_hi;/* Free inodes count MSB */
-	__u16 bg_used_dirs_count_hi;	/* Directories count MSB */
-	__u16 bg_itable_unused_hi;	/* Unused inodes count MSB */
+    __u16 bg_flags;		/* EXT4_BG_flags (INODE_UNINIT, etc) */
+    __u32 bg_reserved[2];		/* Likely block/inode bitmap checksum */
+    __u16 bg_itable_unused;	/* Unused inodes count */
+    __u16 bg_checksum;		/* crc16(sb_uuid+group+desc) */
+    __u32 bg_block_bitmap_hi;	/* Blocks bitmap block MSB */
+    __u32 bg_inode_bitmap_hi;	/* Inodes bitmap block MSB */
+    __u32 bg_inode_table_hi;	/* Inodes table block MSB */
+    __u16 bg_free_blocks_count_hi;/* Free blocks count MSB */
+    __u16 bg_free_inodes_count_hi;/* Free inodes count MSB */
+    __u16 bg_used_dirs_count_hi;	/* Directories count MSB */
+    __u16 bg_itable_unused_hi;	/* Unused inodes count MSB */
     __u32 bg_reserved2[3];
-  };/*}}}*/
+  };
 
 struct ext2_inode
-  {/*{{{*/
+  {
     __u16 i_mode;		/* File mode */
     __u16 i_uid;		/* Owner Uid */
     __u32 i_size;		/* 4: Size in bytes */
@@ -248,28 +238,8 @@ struct ext2_inode
 	__u32  i_crtime;       /* File Creation time */
 	__u32  i_crtime_extra; /* extra FileCreationtime (nsec << 2 | epoch) */
 	__u32  i_version_hi;	/* high 32 bits for 64-bit version */
-  };/*}}}*/
+  };
 
-#define EXT4_FEATURE_COMPAT_DIR_PREALLOC	0x0001
-#define EXT4_FEATURE_COMPAT_IMAGIC_INODES	0x0002
-#define EXT4_FEATURE_COMPAT_HAS_JOURNAL		0x0004
-#define EXT4_FEATURE_COMPAT_EXT_ATTR		0x0008
-#define EXT4_FEATURE_COMPAT_RESIZE_INODE	0x0010
-#define EXT4_FEATURE_COMPAT_DIR_INDEX		0x0020
-
-#define EXT4_FEATURE_RO_COMPAT_SPARSE_SUPER	0x0001
-#define EXT4_FEATURE_RO_COMPAT_LARGE_FILE	0x0002
-#define EXT4_FEATURE_RO_COMPAT_BTREE_DIR	0x0004
-#define EXT4_FEATURE_RO_COMPAT_HUGE_FILE    0x0008
-#define EXT4_FEATURE_RO_COMPAT_GDT_CSUM		0x0010
-#define EXT4_FEATURE_RO_COMPAT_DIR_NLINK	0x0020
-#define EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE	0x0040
-
-#define EXT4_FEATURE_INCOMPAT_COMPRESSION	0x0001
-#define EXT4_FEATURE_INCOMPAT_FILETYPE		0x0002
-#define EXT4_FEATURE_INCOMPAT_RECOVER		0x0004 /* Needs recovery */
-#define EXT4_FEATURE_INCOMPAT_JOURNAL_DEV	0x0008 /* Journal device */
-#define EXT4_FEATURE_INCOMPAT_META_BG		0x0010
 #define EXT4_FEATURE_INCOMPAT_EXTENTS		0x0040 /* extents support */
 #define EXT4_FEATURE_INCOMPAT_64BIT			0x0080 /* bergwolf:grub not supported*/
 #define EXT4_FEATURE_INCOMPAT_MMP           0x0100
@@ -279,10 +249,9 @@ struct ext2_inode
 	( sb->s_feature_incompat & mask )
 
 #define EXT4_EXTENTS_FL		0x00080000 /* Inode uses extents */
-#define EXT4_HUGE_FILE_FL	0x00040000 /* Set to each huge file *//*}}}*/
+#define EXT4_HUGE_FILE_FL	0x00040000 /* Set to each huge file */
 
 #define EXT4_MIN_DESC_SIZE			32
-#define EXT4_MIN_DESC_SIZE_64BIT	64
 
 /* linux/limits.h */
 #define NAME_MAX         255	/* # chars in a file name */
@@ -302,7 +271,7 @@ struct ext2_dir_entry
   };
 
 /* linux/ext4_fs_extents.h */ 
-/* This is the extent on-disk structure.{{{
+/* This is the extent on-disk structure.
  * It's used at the bottom of the tree.
  */
 struct ext4_extent 
@@ -338,21 +307,6 @@ struct ext4_extent_header
     __u32  eh_generation;  /* generation of the tree */
   };
 
-/*
- * Array of ext4_ext_path contains path to some extent.
- * Creation/lookup routines use it for traversal/splitting/etc.
- * Truncate uses it to simulate recursive walking.
- */
-struct ext4_ext_path 
-  {
-	__u64				p_block;
-	__u16				p_depth;
-	struct ext4_extent			*p_ext;
-	struct ext4_extent_idx		*p_idx;
-	struct ext4_extent_header	*p_hdr;
-	struct buffer_head			*p_bh;
-  };
-
 #define EXT4_EXT_MAGIC      (0xf30a)
 #define EXT_FIRST_EXTENT(__hdr__) \
     ((struct ext4_extent *) (((char *) (__hdr__)) +     \
@@ -364,7 +318,7 @@ struct ext4_ext_path
     (EXT_FIRST_EXTENT((__hdr__)) + (__u16)((__hdr__)->eh_entries) - 1)
 #define EXT_LAST_INDEX(__hdr__) \
     (EXT_FIRST_INDEX((__hdr__)) + (__u16)((__hdr__)->eh_entries) - 1)
-/*}}}*/
+
 
 
 /* linux/ext2fs.h */
@@ -450,9 +404,8 @@ ffz (unsigned long word)
 /* check filesystem types and read superblock into memory buffer */
 int
 ext2fs_mount (void)
-{/*{{{*/
+{
   int retval = 1;
-  ext_type = 0;
 
   if ((((current_drive & 0x80) || (current_slice != 0))
        && (current_slice != PC_SLICE_TYPE_EXT2FS)
@@ -468,7 +421,7 @@ ext2fs_mount (void)
       retval = 0;
 
   return retval;
-}/*}}}*/
+}
 
 /* Takes a file system block number and reads it into BUFFER. */
 static int
@@ -488,7 +441,7 @@ ext2_rdfsb (int fsblock, int buffer)
    a physical block (the location in the file system) via an inode. */
 static int
 ext2fs_block_map (int logical_block)
-{/*{{{*/
+{
 
 #ifdef E2DEBUG
   unsigned char *i;
@@ -586,7 +539,7 @@ ext2fs_block_map (int logical_block)
     }
   return ((__u32 *) DATABLOCK2)
     [logical_block & (EXT2_ADDR_PER_BLOCK (SUPERBLOCK) - 1)];
-}/*}}}*/
+}
 
 /* extent binary search index
  * find closest index in the current level extent tree
@@ -594,7 +547,7 @@ ext2fs_block_map (int logical_block)
  */
 static struct ext4_extent_idx*
 ext4_ext_binsearch_idx(struct ext4_extent_header* eh, int logical_block)
-{/*{{{*/
+{
   struct ext4_extent_idx *r, *l, *m;
   l = EXT_FIRST_INDEX(eh) + 1;
   r = EXT_LAST_INDEX(eh);
@@ -607,7 +560,7 @@ ext4_ext_binsearch_idx(struct ext4_extent_header* eh, int logical_block)
 		  l = m + 1;
 	}
   return (struct ext4_extent_idx*)(l - 1);
-}/*}}}*/
+}
 
 /* extent binary search 
  * find closest extent in the leaf level 
@@ -615,7 +568,7 @@ ext4_ext_binsearch_idx(struct ext4_extent_header* eh, int logical_block)
  */
 static struct ext4_extent*
 ext4_ext_binsearch(struct ext4_extent_header* eh, int logical_block)
-{/*{{{*/
+{
   struct ext4_extent *r, *l, *m;
   l = EXT_FIRST_EXTENT(eh) + 1;
   r = EXT_LAST_EXTENT(eh);
@@ -628,14 +581,14 @@ ext4_ext_binsearch(struct ext4_extent_header* eh, int logical_block)
 		  l = m + 1;
 	}
   return (struct ext4_extent*)(l - 1);
-}/*}}}*/
+}
 
-/* bergwolf: Maps extents enabled logical block into physical block via an inode. 
+/* Maps extents enabled logical block into physical block via an inode. 
  * EXT4_HUGE_FILE_FL should be checked before calling this.
  */
 static int
 ext4fs_block_map (int logical_block)
-{/*{{{*/
+{
   struct ext4_extent_header *eh;
   struct ext4_extent *ex, *extent;
   struct ext4_extent_idx *ei, *index;
@@ -663,27 +616,20 @@ ext4fs_block_map (int logical_block)
 #endif /* E2DEBUG */
   eh = (struct ext4_extent_header*)INODE->i_block;
   if (eh->eh_magic != EXT4_EXT_MAGIC)
-	  return -1;
+  {
+          errnum = ERR_FSYS_CORRUPT;
+          return -1;
+  }
   while((depth = eh->eh_depth) != 0)
   	{ /* extent index */
 	  if (eh->eh_magic != EXT4_EXT_MAGIC)
+	  {
+	          errnum = ERR_FSYS_CORRUPT;
 		  return -1;
-	//  ei = ext4_ext_binsearch_idx(eh, logical_block);
-	  index = EXT_FIRST_INDEX(eh);
-	  for (i = 0; i < eh->eh_entries; i++)
-	{
-		  if (logical_block < index[i].ei_block)
-			  break;
-	}
-	  if (i-- < 0)
-	{
-		errnum = ERR_FSYS_CORRUPT;
-		return -1;
-	}
-	  ei = &index[i];
-
+	  }
+	  ei = ext4_ext_binsearch_idx(eh, logical_block);
 	  if (ei->ei_leaf_hi)
-	{/* bergwolf: 64bit physical block number not supported yet */
+	{/* 64bit physical block number not supported */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
@@ -692,26 +638,14 @@ ext4fs_block_map (int logical_block)
 	  errnum = ERR_FSYS_CORRUPT;
 	  return -1;
 	}
+	  printf("next level\n");
 	  eh = (struct ext4_extent_header*)DATABLOCK1;
   	}
 
   /* depth==0, we come to the leaf */
-//  ex = ext4_ext_binsearch(eh, logical_block);
-  extent = EXT_FIRST_EXTENT(eh);
-  for (i = 0; i < eh->eh_entries; i++)
-	{
-	  if (logical_block < extent[i].ee_block)
-		  break;
-	}
-	  if (i-- < 0)
-	{
-		errnum = ERR_FSYS_CORRUPT;
-		return -1;
-	}
-  ex = &extent[i];
-
+  ex = ext4_ext_binsearch(eh, logical_block);
   if (ex->ee_start_hi) 
-	{/* bergwolf: 48bit physical block number not supported yet */
+	{/* 64bit physical block number not supported */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
@@ -722,12 +656,12 @@ ext4fs_block_map (int logical_block)
 	}
   return ex->ee_start_lo + logical_block - ex->ee_block;
 
-}/*}}}*/
+}
 
 /* preconditions: all preconds of ext2fs_block_map */
 int
 ext2fs_read (char *buf, int len)
-{/*{{{*/
+{
   int logical_block;
   int offset;
   int map;
@@ -758,12 +692,12 @@ ext2fs_read (char *buf, int len)
       /* find the (logical) block component of our location */
       logical_block = filepos >> EXT2_BLOCK_SIZE_BITS (SUPERBLOCK);
       offset = filepos & (EXT2_BLOCK_SIZE (SUPERBLOCK) - 1);
-	  /* bergwolf: map extents enabled logical block number to physical fs on-dick block number */
-	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
-			&& INODE->i_flags & EXT4_EXTENTS_FL)
-		  map = ext4fs_block_map (logical_block);
-	  else
-      	  map = ext2fs_block_map (logical_block);
+      /* map extents enabled logical block number to physical fs on-dick block number */
+      if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
+                    && INODE->i_flags & EXT4_EXTENTS_FL)
+          map = ext4fs_block_map (logical_block);
+      else
+          map = ext2fs_block_map (logical_block);
 #ifdef E2DEBUG
       printf ("map=%d\n", map);
 #endif /* E2DEBUG */
@@ -796,7 +730,7 @@ ext2fs_read (char *buf, int len)
     ret = 0;
 
   return ret;
-}/*}}}*/
+}
 
 
 /* Based on:
@@ -839,7 +773,7 @@ int ext2_is_fast_symlink (void)
  */
 int
 ext2fs_dir (char *dirname)
-{/*{{{*/
+{
   int current_ino = EXT2_ROOT_INO;	/* start at the root */
   int updir_ino = current_ino;	/* the parent of the current directory */
   int group_id;			/* which group the inode is in */
@@ -872,7 +806,7 @@ ext2fs_dir (char *dirname)
    */
 
   while (1)
-    {/*{{{*/
+    {
 #ifdef E2DEBUG
       printf ("inode %d\n", current_ino);
       printf ("dirname=%s\n", dirname);
@@ -893,11 +827,11 @@ ext2fs_dir (char *dirname)
 	{
 	  return 0;
 	}
-	  ext4_gdp = (struct ext4_group_desc *)( (int)GROUP_DESC + 
+	  ext4_gdp = (struct ext4_group_desc *)( (__u8*)GROUP_DESC + 
 			  		desc * EXT2_DESC_SIZE(SUPERBLOCK));
 	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK, EXT4_FEATURE_INCOMPAT_64BIT)
 		&& (! ext4_gdp->bg_inode_table_hi))
-	{/* bergwolf: 64bit itable not supported yet */
+	{/* 64bit itable not supported */
 	  errnum = ERR_FILELENGTH;
 	  return -1;
 	}
@@ -950,7 +884,7 @@ ext2fs_dir (char *dirname)
 
       /* If we've got a symbolic link, then chase it. */
       if (S_ISLNK (INODE->i_mode))
-	{/*done here{{{*/
+	{
 	  int len;
 	  if (++link_count > MAX_LINK_COUNT)
 	    {
@@ -1019,11 +953,11 @@ ext2fs_dir (char *dirname)
 
 	  /* Try again using the new name. */
 	  continue;
-	}/*}}}*/
+	}
 
       /* if end of filename, INODE points to the file's inode */
       if (!*dirname || isspace (*dirname))
-	{/*done here{{{*/
+	{
 	  if (!S_ISREG (INODE->i_mode))
 	    {
 	      errnum = ERR_BAD_FILETYPE;
@@ -1032,14 +966,14 @@ ext2fs_dir (char *dirname)
 	  /* if file is too large, just stop and report an error*/
 	  if ( (INODE->i_flags & EXT4_HUGE_FILE_FL) && !(INODE->i_size_high))
 	    {
-		  /* bergwolf: file too large, stop reading */
+		  /* file too large, stop reading */
 		  errnum = ERR_FILELENGTH;
 		  return 0;
 	    }
 
 	  filemax = (INODE->i_size);
 	  return 1;
-	}/*}}}*/
+	}
 
       /* else we have to traverse a directory */
       updir_ino = current_ino;
@@ -1065,7 +999,7 @@ ext2fs_dir (char *dirname)
       loc = 0;
 
       do
-	{/*{{{*/
+	{
 
 #ifdef E2DEBUG
 	  printf ("dirname=%s, rest=%s, loc=%d\n", dirname, rest, loc);
@@ -1096,17 +1030,22 @@ ext2fs_dir (char *dirname)
 	  /* we know which logical block of the directory entry we are looking
 	     for, now we have to translate that to the physical (fs) block on
 	     the disk */
-	  /* bergwolf: map extents enabled logical block number to physical fs on-dick block number */
+	  /* map extents enabled logical block number to physical fs on-dick block number */
 	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
-			&& INODE->i_flags & EXT4_EXTENTS_FL)
-		  map = ext4fs_block_map (blk);
+                        && INODE->i_flags & EXT4_EXTENTS_FL)
+              map = ext4fs_block_map (blk);
 	  else
-	  	  map = ext2fs_block_map (blk);
+              map = ext2fs_block_map (blk);
 #ifdef E2DEBUG
 	  printf ("fs block=%d\n", map);
 #endif /* E2DEBUG */
 	  mapblock2 = -1;
-	  if ((map < 0) || !ext2_rdfsb (map, DATABLOCK2))
+	  if (map < 0) 
+	  {
+	      *rest = ch;
+	      return 0;
+	  }
+          if (!ext2_rdfsb (map, DATABLOCK2))
 	    {
 	      errnum = ERR_FSYS_CORRUPT;
 	      *rest = ch;
@@ -1145,13 +1084,13 @@ ext2fs_dir (char *dirname)
 	      dp->name[dp->name_len] = saved_c;
 	    }
 
-	}/*}}}*/
+	}
       while (!dp->inode || (str_chk || (print_possibilities && ch != '/')));
 
       current_ino = dp->inode;
       *(dirname = rest) = ch;
-    }/*}}}*/
+    }
   /* never get here */
-}/*}}}*/
+}
 
 #endif /* FSYS_EXT2_FS */
