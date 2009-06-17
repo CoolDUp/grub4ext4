@@ -1,0 +1,23 @@
+#summary One-sentence summary of this page.
+build grub4ext4 from svn source code
+= Introduction =
+
+
+= Details =
+Typically this uses quilt to manage these patches.
+
+1. checkout the source code:
+
+    * svn checkout http://grub4ext4.googlecode.com/svn/trunk/ grub4ext4-read-only
+
+2. build the source tree:
+
+    * quilt setup grub.spec
+
+3. build grub
+
+    * cd grub-0.97
+
+    * configure
+
+    * make
