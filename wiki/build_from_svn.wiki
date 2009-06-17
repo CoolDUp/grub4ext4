@@ -1,9 +1,7 @@
-#build grub4ext4 from svn source code
-= Introduction =
+#summary Build grub4ext4 from svn source code
+=Build grub4ext4 from svn source code=
 
-
-= Details =
-Typically this uses quilt to manage these patches.
+Typically, one can use quilt(http://ftp.twaren.net/Unix/NonGNU/quilt/) to manage these patches
 
 1. checkout the source code:
 
