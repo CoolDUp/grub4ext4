@@ -380,7 +380,7 @@
        logical_block = filepos >> EXT2_BLOCK_SIZE_BITS (SUPERBLOCK);
        offset = filepos & (EXT2_BLOCK_SIZE (SUPERBLOCK) - 1);
 -      map = ext2fs_block_map (logical_block);
-+      /* map extents enabled logical block number to physical fs on-dick block number */
++      /* map logical block of an extents enabled file into a physical block on the disk */
 +      if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
 +                    && INODE->i_flags & EXT4_EXTENTS_FL)
 +          map = ext4fs_block_map (logical_block);
@@ -464,7 +464,7 @@
  	     for, now we have to translate that to the physical (fs) block on
  	     the disk */
 -	  map = ext2fs_block_map (blk);
-+	  /* map extents enabled logical block number to physical fs on-dick block number */
++	  /* map logical block of an extents enabled file into a physical block on the disk */
 +	  if (EXT4_HAS_INCOMPAT_FEATURE(SUPERBLOCK,EXT4_FEATURE_INCOMPAT_EXTENTS) 
 +                        && INODE->i_flags & EXT4_EXTENTS_FL)
 +              map = ext4fs_block_map (blk);
