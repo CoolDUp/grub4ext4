@@ -7,13 +7,15 @@ Typically, one can use quilt(http://ftp.twaren.net/Unix/NonGNU/quilt/) to manage
 
     * svn checkout http://grub4ext4.googlecode.com/svn/trunk/ grub4ext4-read-only
 
-2. build the source tree:
+2. setup the source tree:
 
     * quilt setup grub.spec
 
-3. build grub
-
     * cd grub-0.97
+
+    * quilt push -a
+
+3. build grub
 
     * configure
 
